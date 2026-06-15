@@ -2,72 +2,121 @@
 RAG Vector Store for the SMIT Teaching Assistant
 =================================================
 
-Uses ChromaDB as the vector database (persistent, local).
-Embeddings are generated with scikit-learn's TF-IDF vectorizer so the whole
-pipeline runs fully offline -- no API key / model download needed for embedding.
+A small, self-contained vector store (numpy + pickle) — no external vector
+database service required. This avoids a known dependency conflict where
+`chromadb` pulls in `opentelemetry`/`grpc`/`protobuf` packages that crash on
+newer Python versions (e.g. Python 3.14 on Streamlit Cloud).
 
-In production you could swap `LocalTfidfEmbedding` for OpenAI / Voyage / Cohere
-embeddings, or sentence-transformers, by implementing the same `__call__` interface
-that chromadb.EmbeddingFunction expects. Everything else (collections, querying,
-persistence) stays the same.
+Embeddings are generated with scikit-learn's TF-IDF + SVD, fully offline --
+no API key / model download needed.
+
+`retrieve_context()` keeps the same interface as before, so nothing else in
+the app (agents.py, main.py, app.py) needs to change.
+
+--------------------------------------------------------------------------
+Swapping in a real vector DB (Qdrant / Pinecone / ChromaDB) for production:
+  - Keep `LocalTfidfEmbedding` (or swap for OpenAI/Voyage embeddings)
+  - Replace `SimpleVectorStore` with calls to your DB's client
+  - Keep the same `retrieve_context(query, n_results)` -> list[dict] interface:
+        [{"text": ..., "metadata": {...}, "distance": float}, ...]
+--------------------------------------------------------------------------
 """
 
 import json
 import os
 import pickle
 
-import chromadb
-from chromadb import Documents, EmbeddingFunction, Embeddings
+import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.decomposition import TruncatedSVD
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
-DB_DIR = os.path.join(os.path.dirname(__file__), "chroma_db")
-VECTORIZER_PATH = os.path.join(DB_DIR, "tfidf_vectorizer.pkl")
-SVD_PATH = os.path.join(DB_DIR, "svd.pkl")
+DB_DIR = os.path.join(os.path.dirname(__file__), "vector_db")
+STORE_PATH = os.path.join(DB_DIR, "store.pkl")
 
 EMBED_DIM = 64  # dimensionality after SVD reduction
 
 
-class LocalTfidfEmbedding(EmbeddingFunction):
-    """
-    A self-contained embedding function: TF-IDF -> TruncatedSVD (dense vectors).
-    The vectorizer/SVD are fit once on the knowledge base corpus and saved to disk
-    so that the same transformation is used for both indexing and querying.
-    """
+class LocalTfidfEmbedding:
+    """TF-IDF -> TruncatedSVD (dense vectors). Fit once on the corpus."""
 
     def __init__(self):
         self.vectorizer = None
         self.svd = None
-        self._load_if_exists()
-
-    def _load_if_exists(self):
-        if os.path.exists(VECTORIZER_PATH) and os.path.exists(SVD_PATH):
-            with open(VECTORIZER_PATH, "rb") as f:
-                self.vectorizer = pickle.load(f)
-            with open(SVD_PATH, "rb") as f:
-                self.svd = pickle.load(f)
 
     def fit(self, corpus: list[str]):
-        os.makedirs(DB_DIR, exist_ok=True)
         n_components = min(EMBED_DIM, max(2, len(corpus) - 1))
         self.vectorizer = TfidfVectorizer(stop_words="english")
         tfidf_matrix = self.vectorizer.fit_transform(corpus)
         self.svd = TruncatedSVD(n_components=n_components, random_state=42)
         self.svd.fit(tfidf_matrix)
-        with open(VECTORIZER_PATH, "wb") as f:
-            pickle.dump(self.vectorizer, f)
-        with open(SVD_PATH, "wb") as f:
-            pickle.dump(self.svd, f)
 
-    def __call__(self, input: Documents) -> Embeddings:
+    def transform(self, texts: list[str]) -> np.ndarray:
         if self.vectorizer is None or self.svd is None:
-            raise RuntimeError(
-                "Embedding model not fitted yet. Run build_knowledge_base() first."
-            )
-        tfidf_matrix = self.vectorizer.transform(input)
-        dense = self.svd.transform(tfidf_matrix)
-        return dense.tolist()
+            raise RuntimeError("Embedding model not fitted yet.")
+        tfidf_matrix = self.vectorizer.transform(texts)
+        return self.svd.transform(tfidf_matrix)
+
+
+class SimpleVectorStore:
+    """Minimal vector store: in-memory numpy array + cosine distance search."""
+
+    def __init__(self):
+        self.embedder = LocalTfidfEmbedding()
+        self.documents: list = []
+        self.metadatas: list = []
+        self.ids: list = []
+        self.embeddings = None
+
+    def build(self, documents, metadatas, ids):
+        self.documents = documents
+        self.metadatas = metadatas
+        self.ids = ids
+        self.embedder.fit(documents)
+        self.embeddings = self.embedder.transform(documents)
+
+    def query(self, query_text: str, n_results: int = 4, where: dict | None = None):
+        query_vec = self.embedder.transform([query_text])[0]
+
+        # Optional metadata filter (e.g. {"type": "rubric"})
+        candidate_idx = list(range(len(self.documents)))
+        if where:
+            candidate_idx = [
+                i for i in candidate_idx
+                if all(self.metadatas[i].get(k) == v for k, v in where.items())
+            ]
+        if not candidate_idx:
+            return []
+
+        embs = self.embeddings[candidate_idx]
+
+        # Cosine distance = 1 - cosine similarity
+        query_norm = query_vec / (np.linalg.norm(query_vec) + 1e-10)
+        embs_norm = embs / (np.linalg.norm(embs, axis=1, keepdims=True) + 1e-10)
+        similarities = embs_norm @ query_norm
+        distances = 1 - similarities
+
+        order = np.argsort(distances)[:n_results]
+
+        results = []
+        for rank in order:
+            i = candidate_idx[rank]
+            results.append({
+                "text": self.documents[i],
+                "metadata": self.metadatas[i],
+                "distance": float(distances[rank]),
+            })
+        return results
+
+    def save(self, path: str = STORE_PATH):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "wb") as f:
+            pickle.dump(self, f)
+
+    @staticmethod
+    def load(path: str = STORE_PATH) -> "SimpleVectorStore":
+        with open(path, "rb") as f:
+            return pickle.load(f)
 
 
 def _load_json(path):
@@ -90,21 +139,16 @@ def _chunk_markdown(md_text: str):
     return [c for c in chunks if c.strip()]
 
 
-def build_knowledge_base(reset: bool = False):
+def build_knowledge_base(reset: bool = False) -> SimpleVectorStore:
     """
-    Builds (or rebuilds) the ChromaDB collection 'smit_knowledge_base' from:
+    Builds (or rebuilds) the vector store from:
       - data/rubrics.json          (grading rubrics)
       - data/common_mistakes.json  (common student mistakes + explanations)
       - data/class_notes.md        (class notes, chunked by heading)
-
-    Returns the ChromaDB collection, ready for querying.
     """
     if reset and os.path.exists(DB_DIR):
         import shutil
         shutil.rmtree(DB_DIR)
-
-    os.makedirs(DB_DIR, exist_ok=True)
-    client = chromadb.PersistentClient(path=DB_DIR)
 
     rubrics = _load_json(os.path.join(DATA_DIR, "rubrics.json"))
     mistakes = _load_json(os.path.join(DATA_DIR, "common_mistakes.json"))
@@ -136,28 +180,17 @@ def build_knowledge_base(reset: bool = False):
         metadatas.append({"type": "class_notes", "source_id": f"notes_{i}"})
         ids.append(f"notes_{i}")
 
-    embedder = LocalTfidfEmbedding()
-    embedder.fit(documents)  # fit on the whole corpus, then persist
-
-    # Drop old collection if present so we don't get duplicate-id errors on rebuild
-    try:
-        client.delete_collection("smit_knowledge_base")
-    except Exception:
-        pass
-
-    collection = client.create_collection(
-        name="smit_knowledge_base",
-        embedding_function=embedder,
-    )
-    collection.add(documents=documents, metadatas=metadatas, ids=ids)
-    return collection
+    store = SimpleVectorStore()
+    store.build(documents, metadatas, ids)
+    store.save()
+    return store
 
 
-def get_collection():
-    """Get the existing collection (assumes build_knowledge_base() was run before)."""
-    client = chromadb.PersistentClient(path=DB_DIR)
-    embedder = LocalTfidfEmbedding()
-    return client.get_collection(name="smit_knowledge_base", embedding_function=embedder)
+def get_collection() -> SimpleVectorStore:
+    """Load the existing vector store (assumes build_knowledge_base() was run before)."""
+    if not os.path.exists(STORE_PATH):
+        raise FileNotFoundError("Vector store not built yet. Run build_knowledge_base().")
+    return SimpleVectorStore.load()
 
 
 def retrieve_context(query: str, n_results: int = 4, where: dict | None = None):
@@ -165,17 +198,8 @@ def retrieve_context(query: str, n_results: int = 4, where: dict | None = None):
     Retrieve the most relevant chunks (rubric criteria, common mistakes, class notes)
     for a given query (e.g. the student's code, or a description of the assignment).
     """
-    collection = get_collection()
-    kwargs = {"query_texts": [query], "n_results": n_results}
-    if where:
-        kwargs["where"] = where
-    results = collection.query(**kwargs)
-    retrieved = []
-    for doc, meta, dist in zip(
-        results["documents"][0], results["metadatas"][0], results["distances"][0]
-    ):
-        retrieved.append({"text": doc, "metadata": meta, "distance": dist})
-    return retrieved
+    store = get_collection()
+    return store.query(query, n_results=n_results, where=where)
 
 
 if __name__ == "__main__":

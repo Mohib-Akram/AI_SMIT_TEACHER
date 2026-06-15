@@ -29,7 +29,7 @@ st.set_page_config(page_title="SMIT AI Teaching Assistant", page_icon="🎓", la
 # ---------------------------------------------------------------------------
 @st.cache_resource(show_spinner=False)
 def ensure_knowledge_base():
-    db_dir = os.path.join(os.path.dirname(__file__), "chroma_db")
+    db_dir = os.path.join(os.path.dirname(__file__), "vector_db")
     if not os.path.exists(db_dir):
         build_knowledge_base(reset=True)
     else:

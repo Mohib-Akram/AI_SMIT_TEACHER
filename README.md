@@ -9,7 +9,7 @@ SMIT-style programming classes (beginner JS/HTML/CSS assignments).
 Student submits code (app.js / index.js)
         |
         v
- [RAG: vector_store.py]  --> ChromaDB (local, persistent)
+ [RAG: vector_store.py]  --> Local vector store (numpy, persistent)
    retrieves relevant:
      - grading rubric for this assignment type
      - common student mistakes + Roman Urdu/English explanations
@@ -34,13 +34,18 @@ Student submits code (app.js / index.js)
 
 ## Vector Database
 
-Uses **ChromaDB** (runs locally, persisted to `./chroma_db/`, no account/API
-key needed for the DB itself). Embeddings are generated with a local
+Uses a small **self-contained vector store** (`vector_db/store.pkl`, numpy +
+pickle, no account/API key needed). Embeddings are generated with a local
 TF-IDF + SVD pipeline (scikit-learn) so the whole RAG index can be built
 fully offline.
 
-> To use Qdrant or Pinecone instead: swap `vector_store.py`'s
-> `chromadb.PersistentClient` for `QdrantClient` / Pinecone's client and keep
+> Earlier versions used ChromaDB, but it pulls in `opentelemetry`/`grpc`/
+> `protobuf` packages that conflict on newer Python (e.g. Streamlit Cloud's
+> Python 3.14). The lightweight store removes that fragility while keeping
+> the exact same `retrieve_context()` interface.
+
+> To use Qdrant or Pinecone instead: replace `SimpleVectorStore` in
+> `vector_store.py` with calls to `QdrantClient` / Pinecone's client and keep
 > the same `retrieve_context()` interface — the rest of the system (agents,
 > main.py) doesn't need to change.
 

@@ -32,7 +32,7 @@ REPORTS_DIR = os.path.join(os.path.dirname(__file__), "reports")
 
 def ensure_knowledge_base():
     """Build the RAG index on first run if it doesn't exist yet."""
-    db_dir = os.path.join(os.path.dirname(__file__), "chroma_db")
+    db_dir = os.path.join(os.path.dirname(__file__), "vector_db")
     if not os.path.exists(db_dir):
         print("[setup] No knowledge base found - building it now...")
         build_knowledge_base(reset=True)

@@ -1,0 +1,72 @@
+[
+  {
+    "id": "mistake_01",
+    "topic": "var vs let const scope hoisting javascript",
+    "mistake": "Using 'var' instead of 'let' or 'const', causing scope leakage and hoisting bugs.",
+    "explanation_en": "var is function-scoped and gets hoisted, which can cause variables to be accessible outside the block they were meant for, leading to bugs. let and const are block-scoped and safer.",
+    "explanation_roman_urdu": "var function ke andar kahin bhi accessible ho jata hai, aur hoisting ki wajah se variable declare hone se pehle bhi 'undefined' return kar sakta hai. Hamesha let ya const use karo, kyunke wo block ke andar hi rehte hain."
+  },
+  {
+    "id": "mistake_02",
+    "topic": "infinite loop for while loop condition increment",
+    "mistake": "Forgetting to increment/update the loop counter, causing an infinite loop.",
+    "explanation_en": "If the loop variable is never updated inside the loop, the condition stays true forever and the program freezes or crashes.",
+    "explanation_roman_urdu": "Agar loop ke andar counter (i++ jaisa) update nahi hota, to loop kabhi khatam nahi hoga aur program hang ho jayega. Har loop mein increment/decrement zaroor likho."
+  },
+  {
+    "id": "mistake_03",
+    "topic": "naming convention camelCase variable function names",
+    "mistake": "Inconsistent or unclear naming like 'x1', 'data2', 'temp' instead of meaningful camelCase names.",
+    "explanation_en": "Meaningful names like 'studentMarks' or 'calculateTotal' make code readable and easier to debug.",
+    "explanation_roman_urdu": "Variable aur function ke naam meaningful hone chahiye, jaise 'studentMarks' na ke 'x1'. Isse code padhna aur samajhna asaan ho jata hai."
+  },
+  {
+    "id": "mistake_04",
+    "topic": "file naming folder structure project organization",
+    "mistake": "Files named like 'Assignment 1 FINAL (2).js' with spaces and capital letters, or all code in one giant file.",
+    "explanation_en": "File names should be lowercase, no spaces, descriptive (e.g. index.js, calculator.js). Related files should be organized in folders like src/, assets/.",
+    "explanation_roman_urdu": "File ka naam lowercase aur bina space ke hona chahiye, jaise 'index.js'. Agar project bara hai to files ko folders mein organize karo, sab kuch ek file mein na dalo."
+  },
+  {
+    "id": "mistake_05",
+    "topic": "duplicate code repeated logic functions reusability",
+    "mistake": "Copy-pasting the same block of code multiple times instead of writing a reusable function.",
+    "explanation_en": "If similar logic appears more than once, extract it into a function with parameters. This reduces bugs and makes maintenance easier.",
+    "explanation_roman_urdu": "Agar same code 2-3 jagah likha hai, to usay ek function bana ke parameters ke sath reuse karo. Isse code chota aur maintain karna asaan hota hai."
+  },
+  {
+    "id": "mistake_06",
+    "topic": "equality comparison double equals triple equals type coercion",
+    "mistake": "Using == instead of === causing unexpected type coercion bugs.",
+    "explanation_en": "== converts types before comparing, which can cause '0' == false to be true. === checks both value and type, which is safer.",
+    "explanation_roman_urdu": "== use karne se JavaScript types ko automatically convert karke compare karta hai, jis se ajeeb bugs aate hain. Hamesha === use karo jo value aur type dono check karta hai."
+  },
+  {
+    "id": "mistake_07",
+    "topic": "dom event listener inline onclick html javascript",
+    "mistake": "Using inline onclick='...' attributes in HTML instead of addEventListener in JS.",
+    "explanation_en": "Inline event handlers mix HTML and JS logic, making code harder to maintain. Use addEventListener in the JS file instead.",
+    "explanation_roman_urdu": "HTML ke andar onclick likhna code ko messy bana deta hai. Behtar hai ke JS file mein addEventListener use karo."
+  },
+  {
+    "id": "mistake_08",
+    "topic": "console.log debugging leftover code cleanup",
+    "mistake": "Leaving multiple console.log() debugging statements in the final submission.",
+    "explanation_en": "Debug logs left in final code look unprofessional and can clutter output. Remove them before submitting, or use them purposefully for required output only.",
+    "explanation_roman_urdu": "Final submission mein bohat saare console.log() chorna acha nahi lagta. Submit karne se pehle unnecessary logs hata do."
+  },
+  {
+    "id": "mistake_09",
+    "topic": "indentation formatting consistent style code readability",
+    "mistake": "Inconsistent indentation (mixing tabs/spaces, no indentation inside blocks).",
+    "explanation_en": "Consistent indentation (2 or 4 spaces) makes code readable and helps spot bracket/scope errors quickly.",
+    "explanation_roman_urdu": "Code ki indentation consistent honi chahiye (2 ya 4 spaces). Isse code parhna aasan hota hai aur galtiyan jaldi nazar aati hain."
+  },
+  {
+    "id": "mistake_10",
+    "topic": "function return value undefined missing return statement",
+    "mistake": "Function performs a calculation but forgets to 'return' the result, so it returns undefined.",
+    "explanation_en": "Without a return statement, calling the function gives 'undefined' even if calculations happened inside. Always return the final value.",
+    "explanation_roman_urdu": "Agar function ke andar 'return' nahi likha, to function ka result 'undefined' aayega chahe calculation sahi ho. Hamesha aakhri value ko return karo."
+  }
+]

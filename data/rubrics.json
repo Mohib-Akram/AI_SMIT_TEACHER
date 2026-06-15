@@ -1,0 +1,38 @@
+[
+  {
+    "id": "rubric_js_basics_01",
+    "assignment": "JavaScript Basics - Variables, Functions, Loops",
+    "topic": "javascript basics variables functions loops conditionals",
+    "criteria": [
+      {"name": "Correct file naming (index.js / app.js, lowercase, no spaces)", "marks": 5},
+      {"name": "Proper folder structure (src/, assets/ if needed)", "marks": 5},
+      {"name": "Use of let/const instead of var", "marks": 10},
+      {"name": "Functions are reusable (no copy-pasted logic)", "marks": 15},
+      {"name": "Proper indentation and consistent formatting", "marks": 10},
+      {"name": "Meaningful variable and function names (camelCase)", "marks": 10},
+      {"name": "Correct use of loops (for/while) without infinite loops", "marks": 15},
+      {"name": "Comments explaining logic where needed", "marks": 5},
+      {"name": "Program runs without errors and produces correct output", "marks": 25}
+    ],
+    "total_marks": 100,
+    "passing_marks": 50
+  },
+  {
+    "id": "rubric_js_dom_01",
+    "assignment": "DOM Manipulation Project",
+    "topic": "dom manipulation events html css javascript frontend",
+    "criteria": [
+      {"name": "Correct file naming and folder structure (index.html, style.css, app.js)", "marks": 10},
+      {"name": "Event listeners used correctly (addEventListener, no inline onclick)", "marks": 15},
+      {"name": "DOM elements selected efficiently (querySelector/getElementById)", "marks": 10},
+      {"name": "No global variable pollution", "marks": 10},
+      {"name": "Responsive / clean UI", "marks": 10},
+      {"name": "Functions are modular and named clearly", "marks": 15},
+      {"name": "Error handling for empty inputs / edge cases", "marks": 10},
+      {"name": "Code is properly commented", "marks": 10},
+      {"name": "Project works as expected end to end", "marks": 20}
+    ],
+    "total_marks": 100,
+    "passing_marks": 50
+  }
+]

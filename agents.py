@@ -176,10 +176,10 @@ class TutorAgent:
     def explain(self, issues: dict, context_chunks: list[dict]) -> dict:
         context = _format_context(context_chunks)
         all_issues = (
-            issues.get("syntax_issues", [])
-            + issues.get("logic_issues", [])
-            + issues.get("structure_issues", [])
-            + issues.get("best_practice_issues", [])
+            (issues.get("syntax_issues") or [])
+            + (issues.get("logic_issues") or [])
+            + (issues.get("structure_issues") or [])
+            + (issues.get("best_practice_issues") or [])
         )
         if not all_issues:
             return {"explanations": []}

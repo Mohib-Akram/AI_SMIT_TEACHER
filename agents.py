@@ -22,60 +22,87 @@ import anthropic
 # ---------------------------------------------------------------------------
 # Provider configuration
 # ---------------------------------------------------------------------------
-# Two ways to power the agents (both use the `anthropic` SDK / Messages API):
+# Two ways to power the agents:
 #
 # 1. OpenCode Zen (used if OPENCODE_ZEN_API_KEY is set)
-#    - Anthropic-compatible endpoint: https://opencode.ai/zen
-#      (the anthropic SDK appends /v1/messages)
-#    - Get a key from https://opencode.ai/auth
-#    - Model id without any prefix, e.g. "claude-sonnet-4-6"
-#      (see https://opencode.ai/docs/zen/ for the full model list)
+#    - Claude models ("claude-*") -> Anthropic-compatible /v1/messages
+#      at base_url "https://opencode.ai/zen" (paid, requires billing set up
+#      at https://opencode.ai/auth)
+#    - All other models -> OpenAI-compatible /v1/chat/completions
+#      at base_url "https://opencode.ai/zen/v1" (includes several FREE
+#      models, e.g. "big-pickle", "deepseek-v4-flash-free")
+#    - Default model is a FREE model so this works without any billing setup.
+#      Once you've confirmed billing on your Zen account, set
+#      ZEN_MODEL=claude-sonnet-4-6 (or another Claude model) for better quality.
 #
 # 2. Direct Anthropic API (used if ANTHROPIC_API_KEY is set instead)
-#    - Default endpoint, model "claude-sonnet-4-6"
+#    - model "claude-sonnet-4-6"
 #
 # Override the model with ZEN_MODEL / ANTHROPIC_MODEL env vars if desired.
+# See https://opencode.ai/docs/zen/ for the full model list.
 
-ZEN_BASE_URL = "https://opencode.ai/zen"
-ZEN_MODEL_DEFAULT = "claude-sonnet-4-6"
+ZEN_ANTHROPIC_BASE_URL = "https://opencode.ai/zen"
+ZEN_OPENAI_BASE_URL = "https://opencode.ai/zen/v1"
+ZEN_MODEL_DEFAULT = "big-pickle"  # free, OpenAI-compatible -- works without billing
 ANTHROPIC_MODEL_DEFAULT = "claude-sonnet-4-6"
 
 _client = None
 _model = None
+_mode = None  # "anthropic" or "openai_compatible"
 
 
 def get_client():
-    global _client, _model
+    global _client, _model, _mode
     if _client is not None:
-        return _client, _model
+        return _client, _model, _mode
 
     zen_key = os.environ.get("OPENCODE_ZEN_API_KEY")
     anthropic_key = os.environ.get("ANTHROPIC_API_KEY")
 
     if zen_key:
-        _client = anthropic.Anthropic(api_key=zen_key, base_url=ZEN_BASE_URL)
         _model = os.environ.get("ZEN_MODEL", ZEN_MODEL_DEFAULT)
+        if _model.startswith("claude"):
+            _client = anthropic.Anthropic(api_key=zen_key, base_url=ZEN_ANTHROPIC_BASE_URL)
+            _mode = "anthropic"
+        else:
+            import openai
+            _client = openai.OpenAI(api_key=zen_key, base_url=ZEN_OPENAI_BASE_URL)
+            _mode = "openai_compatible"
     elif anthropic_key:
         _client = anthropic.Anthropic(api_key=anthropic_key)
         _model = os.environ.get("ANTHROPIC_MODEL", ANTHROPIC_MODEL_DEFAULT)
+        _mode = "anthropic"
     else:
         raise RuntimeError(
             "No API key found. Set ONE of:\n"
             "  export OPENCODE_ZEN_API_KEY=...   (https://opencode.ai/auth)\n"
             "  export ANTHROPIC_API_KEY=sk-ant-...\n"
         )
-    return _client, _model
+    return _client, _model, _mode
 
 
 def _call_claude(system: str, user: str, max_tokens: int = 1500) -> str:
-    client, model = get_client()
-    response = client.messages.create(
+    client, model, mode = get_client()
+
+    if mode == "anthropic":
+        response = client.messages.create(
+            model=model,
+            max_tokens=max_tokens,
+            system=system,
+            messages=[{"role": "user", "content": user}],
+        )
+        return "".join(block.text for block in response.content if block.type == "text")
+
+    # mode == "openai_compatible"
+    response = client.chat.completions.create(
         model=model,
         max_tokens=max_tokens,
-        system=system,
-        messages=[{"role": "user", "content": user}],
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
     )
-    return "".join(block.text for block in response.content if block.type == "text")
+    return response.choices[0].message.content
 
 
 def _format_context(context_chunks: list[dict]) -> str:

@@ -144,9 +144,9 @@ with tab1:
         st.header("📋 Summary")
         col1, col2 = st.columns([1, 2])
         with col1:
-            st.metric("Score", feedback.get("score_line", "N/A"))
+            st.metric("Score", feedback.get("score_line") or "N/A")
         with col2:
-            st.write(feedback.get("summary", ""))
+            st.write(feedback.get("summary") or "")
 
         if feedback.get("top_priority_fixes"):
             st.subheader("⚡ Top priority fixes")
@@ -184,7 +184,7 @@ with tab1:
 
         # ---- Rubric scoring ----
         st.header("📊 Rubric Score")
-        st.write(f"Rubric used: **{rubric_result.get('rubric_used', 'N/A')}**")
+        st.write(f"Rubric used: **{rubric_result.get('rubric_used') or 'N/A'}**")
         for c in rubric_result.get("criteria_scores") or []:
             st.markdown(
                 f"- **{c.get('criterion')}**: {c.get('awarded_marks')} / {c.get('max_marks')} "
@@ -192,7 +192,7 @@ with tab1:
             )
         st.write(
             f"**Total: {rubric_result.get('total_awarded')} / {rubric_result.get('total_possible')} "
-            f"— {rubric_result.get('pass_fail', '').upper()}**"
+            f"— {(rubric_result.get('pass_fail') or '').upper()}**"
         )
 
         # ---- Corrected code ----

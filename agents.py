@@ -17,73 +17,58 @@ Requires: ANTHROPIC_API_KEY environment variable.
 
 import os
 import json
+import anthropic
 
 # ---------------------------------------------------------------------------
 # Provider configuration
 # ---------------------------------------------------------------------------
-# Two ways to power the agents:
+# Two ways to power the agents (both use the `anthropic` SDK / Messages API):
 #
-# 1. OpenCode Zen (default if OPENCODE_ZEN_API_KEY is set)
-#    - OpenAI-compatible endpoint: https://opencode.ai/zen/v1
-#    - Get a key via the OpenCode TUI: run `/connect`, select "OpenCode Zen"
-#      (https://opencode.ai/docs/zen/), or from https://opencode.ai/auth
-#    - Uses the `openai` python package pointed at Zen's base_url
+# 1. OpenCode Zen (used if OPENCODE_ZEN_API_KEY is set)
+#    - Anthropic-compatible endpoint: https://opencode.ai/zen
+#      (the anthropic SDK appends /v1/messages)
+#    - Get a key from https://opencode.ai/auth
+#    - Model id without any prefix, e.g. "claude-sonnet-4-6"
+#      (see https://opencode.ai/docs/zen/ for the full model list)
 #
-# 2. Direct Anthropic API (fallback if ANTHROPIC_API_KEY is set instead)
-#    - Uses the `anthropic` python package directly
+# 2. Direct Anthropic API (used if ANTHROPIC_API_KEY is set instead)
+#    - Default endpoint, model "claude-sonnet-4-6"
 #
 # Override the model with ZEN_MODEL / ANTHROPIC_MODEL env vars if desired.
 
-ZEN_BASE_URL = "https://opencode.ai/zen/v1"
-ZEN_MODEL_DEFAULT = "opencode/claude-sonnet-4-5"  # see `/models` in OpenCode TUI for options
+ZEN_BASE_URL = "https://opencode.ai/zen"
+ZEN_MODEL_DEFAULT = "claude-sonnet-4-6"
 ANTHROPIC_MODEL_DEFAULT = "claude-sonnet-4-6"
 
 _client = None
-_provider = None  # "zen" or "anthropic"
+_model = None
 
 
 def get_client():
-    global _client, _provider
+    global _client, _model
     if _client is not None:
-        return _client, _provider
+        return _client, _model
 
     zen_key = os.environ.get("OPENCODE_ZEN_API_KEY")
     anthropic_key = os.environ.get("ANTHROPIC_API_KEY")
 
     if zen_key:
-        import openai
-        _client = openai.OpenAI(api_key=zen_key, base_url=ZEN_BASE_URL)
-        _provider = "zen"
+        _client = anthropic.Anthropic(api_key=zen_key, base_url=ZEN_BASE_URL)
+        _model = os.environ.get("ZEN_MODEL", ZEN_MODEL_DEFAULT)
     elif anthropic_key:
-        import anthropic
         _client = anthropic.Anthropic(api_key=anthropic_key)
-        _provider = "anthropic"
+        _model = os.environ.get("ANTHROPIC_MODEL", ANTHROPIC_MODEL_DEFAULT)
     else:
         raise RuntimeError(
             "No API key found. Set ONE of:\n"
             "  export OPENCODE_ZEN_API_KEY=...   (https://opencode.ai/auth)\n"
             "  export ANTHROPIC_API_KEY=sk-ant-...\n"
         )
-    return _client, _provider
+    return _client, _model
 
 
 def _call_claude(system: str, user: str, max_tokens: int = 1500) -> str:
-    client, provider = get_client()
-
-    if provider == "zen":
-        model = os.environ.get("ZEN_MODEL", ZEN_MODEL_DEFAULT)
-        response = client.chat.completions.create(
-            model=model,
-            max_tokens=max_tokens,
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
-        )
-        return response.choices[0].message.content
-
-    # provider == "anthropic"
-    model = os.environ.get("ANTHROPIC_MODEL", ANTHROPIC_MODEL_DEFAULT)
+    client, model = get_client()
     response = client.messages.create(
         model=model,
         max_tokens=max_tokens,
